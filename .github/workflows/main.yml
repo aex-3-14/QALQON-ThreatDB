@@ -1,0 +1,77 @@
+name: QALQON APK Hash ThreatDB
+
+on:
+  schedule:
+    - cron: "17 3 * * 0"  # Sunday 03:17 UTC = 08:17 Uzbekistan; request last 168h
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qalqon-apk-hash-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install requests
+      - name: Test hash and delta logic (offline)
+        run: python -m unittest discover -s tests -v
+      - name: Publish compressed snapshot and incremental deltas (retry safely)
+        env:
+          MALWAREBAZAAR_API_KEY: ${{ secrets.MALWAREBAZAAR_API_KEY }}
+          # This file is outside the Git checkout and is reused on push retries.
+          # Consequently, an ordinary run still performs only two API requests.
+          QALQON_API_CACHE: ${{ runner.temp }}/qalqon-malwarebazaar.json
+        run: |
+          set -euo pipefail
+          git config user.name "QALQON Database Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            echo "Publishing attempt $attempt of 3"
+            # Rebuild on the latest upstream database, not on a stale checkout.
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Uses cached API metadata if a previous attempt already fetched it.
+            python scripts/update.py
+
+            # Remove deprecated signer/plaintext files and tracked Python caches.
+            git rm -f --ignore-unmatch -- \
+              scripts/build_signer_db.py \
+              scripts/extract_apk_signer_candidate.py \
+              tests/test_signer_db.py \
+              database/android_signer_sha256.txt \
+              database/android_signer_sha256.txt.gz \
+              database/android_signer_metadata.json \
+              database/reviewed_android_signers.json \
+              database/apk_hashes.txt
+            git rm -r -f --cached --ignore-unmatch -- \
+              scripts/__pycache__ tests/__pycache__
+
+            git add -A database
+            if git diff --cached --quiet; then
+              echo "No repository changes to publish"
+              exit 0
+            fi
+
+            git commit -m "Update QALQON APK hashes and incremental feed"
+            if git push origin HEAD:main; then
+              echo "Database published successfully"
+              exit 0
+            fi
+            echo "Push was rejected or failed; checking latest remote state before retry"
+          done
+          echo "ERROR: Unable to publish after 3 attempts (check branch protection and network)" >&2
+          exit 1
