@@ -2,18 +2,18 @@
   "schema_version": 2,
   "source": "MalwareBazaar Community API metadata only",
   "type": "apk_sha256",
-  "updated_at": "2026-11-18T12:55:41.925164+00:00",
-  "version": 1,
-  "total_hashes": 109,
-  "new_hashes_added": 9,
+  "updated_at": "2026-11-19T05:36:23.595675+00:00",
+  "version": 2,
+  "total_hashes": 115,
+  "new_hashes_added": 6,
   "hashes_removed_due_to_cap": 0,
   "max_plaintext_bytes": 100000000,
   "full": {
     "path": "apk_hashes.txt.gz",
-    "gzip_bytes": 4120,
-    "gzip_sha256": "5f92cd5b265cbb298faa5b777ca3819b4e0f52efb36c738dee69aa2d1142c570",
-    "plaintext_bytes": 7085,
-    "plaintext_sha256": "edf04ecc8d1ee06cafd1a3686657d3133f780b68a52d4bb06f41bb811153b528"
+    "gzip_bytes": 4348,
+    "gzip_sha256": "c3092fd008f7fb0d696175d4e7493e1c06b2612dba96c10007bc4df0eca6296e",
+    "plaintext_bytes": 7475,
+    "plaintext_sha256": "e0c1fab30feb63d7c11a6ae7a7a6b4701ca83c2bd09f6d384094376bc2c68adb"
   },
   "deltas": [
     {
@@ -26,13 +26,24 @@
       "plaintext_sha256_after": "edf04ecc8d1ee06cafd1a3686657d3133f780b68a52d4bb06f41bb811153b528",
       "added": 9,
       "removed": 0
+    },
+    {
+      "from_version": 1,
+      "to_version": 2,
+      "path": "updates/00000002.delta.gz",
+      "gzip_bytes": 251,
+      "gzip_sha256": "5bccd45cb616a533556f08cdc14813106af82dfcf4fa0de5f5716271cc414a7f",
+      "plaintext_sha256_before": "edf04ecc8d1ee06cafd1a3686657d3133f780b68a52d4bb06f41bb811153b528",
+      "plaintext_sha256_after": "e0c1fab30feb63d7c11a6ae7a7a6b4701ca83c2bd09f6d384094376bc2c68adb",
+      "added": 6,
+      "removed": 0
     }
   ],
   "collection": {
     "lookback_hours": 168,
     "filetype_limit": 1000,
     "filetype_records_returned": 100,
-    "recent_detections_records_returned": 3032,
+    "recent_detections_records_returned": 3019,
     "unique_apk_hashes_returned": 100,
     "filetype_response_hit_cap": false,
     "queries": [
