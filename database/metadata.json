@@ -1,0 +1,45 @@
+{
+  "schema_version": 2,
+  "source": "MalwareBazaar Community API metadata only",
+  "type": "apk_sha256",
+  "updated_at": "2026-11-18T12:55:41.925164+00:00",
+  "version": 1,
+  "total_hashes": 109,
+  "new_hashes_added": 9,
+  "hashes_removed_due_to_cap": 0,
+  "max_plaintext_bytes": 100000000,
+  "full": {
+    "path": "apk_hashes.txt.gz",
+    "gzip_bytes": 4120,
+    "gzip_sha256": "5f92cd5b265cbb298faa5b777ca3819b4e0f52efb36c738dee69aa2d1142c570",
+    "plaintext_bytes": 7085,
+    "plaintext_sha256": "edf04ecc8d1ee06cafd1a3686657d3133f780b68a52d4bb06f41bb811153b528"
+  },
+  "deltas": [
+    {
+      "from_version": 0,
+      "to_version": 1,
+      "path": "updates/00000001.delta.gz",
+      "gzip_bytes": 358,
+      "gzip_sha256": "63abfa57d3576e175a4f0d5debc3adb12c71c7d46cf10a08d203a04fcf6c1bad",
+      "plaintext_sha256_before": "71b6d61e440fee9ea32c0713ffe62c7b2755416df5a6bca87a1b80b839367ccd",
+      "plaintext_sha256_after": "edf04ecc8d1ee06cafd1a3686657d3133f780b68a52d4bb06f41bb811153b528",
+      "added": 9,
+      "removed": 0
+    }
+  ],
+  "collection": {
+    "lookback_hours": 168,
+    "filetype_limit": 1000,
+    "filetype_records_returned": 100,
+    "recent_detections_records_returned": 3032,
+    "unique_apk_hashes_returned": 100,
+    "filetype_response_hit_cap": false,
+    "queries": [
+      "get_file_type(apk, limit=1000)",
+      "recent_detections(hours=168)"
+    ]
+  },
+  "coverage_note": "NOT guaranteed complete for 7 days: get_file_type is limited to 1000, recent_detections is labeled-only, and there is no date-paginated APK metadata feed here.",
+  "client_protocol": "Download metadata first; if up-to-date stop, else apply all versioned .delta.gz steps or download full .gz once. Validate SHA-256 and store transactionally."
+}
