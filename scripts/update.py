@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Metadata-only APK SHA-256 collection; gzip full snapshot + incremental deltas.
+"""Metadata-only APK SHA-256 collection; gzip full snapshot and latest delta.
 
 Never downloads malware samples. Only two MalwareBazaar JSON query types are allowed.
 """
@@ -117,7 +117,7 @@ def load_previous_metadata(existing_bytes: bytes) -> tuple[int, list[dict]]:
         deltas = old.get("deltas")
         if not isinstance(version, int) or version < 0 or not isinstance(deltas, list):
             raise ValueError("Invalid v2 metadata")
-        return version, deltas
+        return version, deltas[-1:]
     if old.get("schema_version") == 1:
         return 0, []
     raise ValueError("Unsupported metadata schema")
@@ -132,11 +132,7 @@ def build_update(previous: list[str], type_items: list[dict], detection_items: l
     if capacity < 1:
         raise ValueError("MAX_BYTES must fit at least one hash")
     merged = previous + added
-    if len(merged) > capacity:
-        to_remove = merged[:len(merged) - capacity]
-        merged = merged[-capacity:]
-    else:
-        to_remove = []
+    merged = merged[-capacity:]
     surviving = set(merged)
     actual_added = [x for x in added if x in surviving]
     old_remaining = set(previous) & surviving
@@ -151,7 +147,7 @@ def build_update(previous: list[str], type_items: list[dict], detection_items: l
 
     prior = render_hashes(previous)
     delta_bytes = None
-    history = list(history)
+    latest = history[-1:]
     if plain != prior:
         # Order is significant: delete old entries, then append new hashes in the same order.
         changes = "".join("-" + x + "\n" for x in actual_removed)
@@ -159,7 +155,7 @@ def build_update(previous: list[str], type_items: list[dict], detection_items: l
         delta_plain = changes.encode("ascii")
         delta_bytes = gzip_bytes(delta_plain)
         next_version = version + 1
-        history.append({
+        latest = [{
             "from_version": version,
             "to_version": next_version,
             "path": f"updates/{next_version:08d}.delta.gz",
@@ -169,7 +165,7 @@ def build_update(previous: list[str], type_items: list[dict], detection_items: l
             "plaintext_sha256_after": sha256(plain),
             "added": len(actual_added),
             "removed": len(actual_removed),
-        })
+        }]
         version = next_version
 
     # An API limit or unlabeled samples may make this incomplete even with daily overlap.
@@ -191,7 +187,7 @@ def build_update(previous: list[str], type_items: list[dict], detection_items: l
             "plaintext_bytes": len(plain),
             "plaintext_sha256": sha256(plain),
         },
-        "deltas": history,
+        "deltas": latest,
         "collection": {
             "lookback_hours": LOOKBACK_HOURS,
             "filetype_limit": FILE_TYPE_LIMIT,
@@ -202,30 +198,50 @@ def build_update(previous: list[str], type_items: list[dict], detection_items: l
             "queries": ["get_file_type(apk, limit=1000)", "recent_detections(hours=168)"],
         },
         "coverage_note": "NOT guaranteed complete for 7 days: get_file_type is limited to 1000, recent_detections is labeled-only, and there is no date-paginated APK metadata feed here.",
-        "client_protocol": "Download metadata first; if up-to-date stop, else apply all versioned .delta.gz steps or download full .gz once. Validate SHA-256 and store transactionally.",
+        "client_protocol": "Download metadata first; if up-to-date stop, else apply the latest .delta.gz if applicable or download the full .gz. Validate SHA-256 and store transactionally.",
     }
     return compressed, delta_bytes, metadata
 
 
 def publish(snapshot_gz: bytes, delta_gz: bytes | None, metadata: dict) -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
-    UPDATES.mkdir(parents=True, exist_ok=True)
+    latest_delta = None
+    if metadata["deltas"]:
+        entry = metadata["deltas"][0]
+        expected_path = f"updates/{metadata['version']:08d}.delta.gz"
+        if (entry.get("path") == expected_path
+                and entry.get("from_version") == metadata["version"] - 1
+                and entry.get("to_version") == metadata["version"]
+                and entry.get("plaintext_sha256_after") == metadata["full"]["plaintext_sha256"]):
+            candidate = UPDATES / Path(expected_path).name
+            if delta_gz is not None:
+                latest_delta = candidate
+            elif candidate.is_file() and candidate.stat().st_size == entry.get("gzip_bytes"):
+                if sha256(candidate.read_bytes()) == entry.get("gzip_sha256"):
+                    latest_delta = candidate
+        if latest_delta is None:
+            metadata["deltas"] = []
+
     with tempfile.TemporaryDirectory(prefix=".tmp_", dir=ROOT) as tmpname:
         temp = Path(tmpname)
         candidate_snapshot = temp / SNAPSHOT.name
         candidate_snapshot.write_bytes(snapshot_gz)
         candidate_metadata = temp / META.name
         candidate_metadata.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-        # Put the immutable delta in place first, then snapshot, then manifest last.
         if delta_gz is not None:
-            delta_target = ROOT / metadata["deltas"][-1]["path"]
-            if delta_target.exists():
-                raise FileExistsError(f"Refusing to overwrite versioned delta {delta_target}")
-            new_delta = temp / delta_target.name
+            if latest_delta is None:
+                raise ValueError("New delta does not match the published version")
+            UPDATES.mkdir(parents=True, exist_ok=True)
+            new_delta = temp / latest_delta.name
             new_delta.write_bytes(delta_gz)
-            os.replace(new_delta, delta_target)
+            os.replace(new_delta, latest_delta)
         os.replace(candidate_snapshot, SNAPSHOT)
         os.replace(candidate_metadata, META)
+
+    # Retire only files generated by this updater. Git publishes all changes together.
+    for previous_delta in UPDATES.glob("*.delta.gz"):
+        if previous_delta != latest_delta and re.fullmatch(r"[0-9]{8}\.delta\.gz", previous_delta.name):
+            previous_delta.unlink()
 
 
 def fetch_or_load_cached_metadata() -> tuple[list[dict], list[dict]]:
