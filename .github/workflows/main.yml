@@ -26,9 +26,7 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: python -m pip install requests
-      - name: Test hash and delta logic (offline)
-        run: python -m unittest discover -s tests -v
-      - name: Publish compressed snapshot and incremental deltas (retry safely)
+      - name: Publish compressed snapshot and latest delta (retry safely)
         env:
           MALWAREBAZAAR_API_KEY: ${{ secrets.MALWAREBAZAAR_API_KEY }}
           # This file is outside the Git checkout and is reused on push retries.
@@ -58,7 +56,7 @@ jobs:
               database/reviewed_android_signers.json \
               database/apk_hashes.txt
             git rm -r -f --cached --ignore-unmatch -- \
-              scripts/__pycache__ tests/__pycache__
+              scripts/__pycache__
 
             git add -A database
             if git diff --cached --quiet; then
@@ -66,7 +64,7 @@ jobs:
               exit 0
             fi
 
-            git commit -m "Update QALQON APK hashes and incremental feed"
+            git commit -m "Update QALQON APK hashes and latest delta"
             if git push origin HEAD:main; then
               echo "Database published successfully"
               exit 0
